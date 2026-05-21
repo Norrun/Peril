@@ -25,10 +25,21 @@ func main() {
 	}
 	//_, _, err = pubsub.DeclareAndBind(con, routing.ExchangePerilDirect, , routing.PauseKey, pubsub.Transient)
 	state := gamelogic.NewGameState(name)
-	err = pubsub.SubscribeJSON(con, routing.ExchangePerilDirect, fmt.Sprint(routing.PauseKey, ".", name), routing.PauseKey, pubsub.Transient, handlerPause(state))
+	err = pubsub.SubscribeJSON(con,
+		routing.ExchangePerilDirect,
+		fmt.Sprint(routing.PauseKey, ".", name),
+		routing.PauseKey, pubsub.Transient,
+		newPauseHandler(state))
 	if err != nil {
 		log.Fatalln(err)
 	}
+	err = pubsub.SubscribeJSON(con,
+		routing.ExchangePerilTopic,
+		fmt.Sprint(routing.ArmyMovesPrefix, ".", name),
+		fmt.Sprint(routing.ArmyMovesPrefix, ".", "*"),
+		pubsub.Transient, newMoveHandler(state),
+	)
+	ch, err := con.Channel()
 
 	for {
 		input := gamelogic.GetInput()
@@ -44,11 +55,20 @@ func main() {
 				continue
 			}
 		case "move":
-			_, err := state.CommandMove(input)
+			am, err := state.CommandMove(input)
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
+			err = pubsub.PublishJSON(ch,
+				routing.ExchangePerilTopic, fmt.Sprint(routing.ArmyMovesPrefix, ".", name),
+				am,
+			)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+			fmt.Println("move succesfull")
 			//fmt.Printf("moved %v to %v successfully", movement.Units, movement.ToLocation)
 		case "status":
 			state.CommandStatus()
