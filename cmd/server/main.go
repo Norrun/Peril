@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/nhelps"
@@ -58,9 +56,9 @@ func main() {
 
 	}
 
-	sigChan := make(chan os.Signal, 1)
+	/*sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
-	<-sigChan
+	<-sigChan*/
 	log.Println("Server is shutting down")
 	//nhelps.RunLogErr(con.Close, "failed to close connectiion on shutdown")
 }
