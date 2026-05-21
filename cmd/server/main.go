@@ -20,7 +20,10 @@ func main() {
 		log.Fatalln("Failed to connect(Dial) to amqp server: ", err)
 	}
 	defer nhelps.RunLogErr(con.Close, "error closing connection to amqp server")
+
 	log.Println("Connection to broker succesfull")
+	_, _, err = pubsub.DeclareAndBind(con,
+		routing.ExchangePerilTopic, routing.GameLogSlug, fmt.Sprint(routing.GameLogSlug, ".", "*"), pubsub.Durable)
 	qChan, err := con.Channel()
 	if err != nil {
 		log.Fatalln(err)
