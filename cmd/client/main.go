@@ -23,11 +23,13 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	_, _, err = pubsub.DeclareAndBind(con, routing.ExchangePerilDirect, fmt.Sprint(routing.PauseKey, ".", name), routing.PauseKey, pubsub.Transient)
+	//_, _, err = pubsub.DeclareAndBind(con, routing.ExchangePerilDirect, , routing.PauseKey, pubsub.Transient)
+	state := gamelogic.NewGameState(name)
+	err = pubsub.SubscribeJSON(con, routing.ExchangePerilDirect, fmt.Sprint(routing.PauseKey, ".", name), routing.PauseKey, pubsub.Transient, handlerPause(state))
 	if err != nil {
 		log.Fatalln(err)
 	}
-	state := gamelogic.NewGameState(name)
+
 	for {
 		input := gamelogic.GetInput()
 		if len(input) == 0 {
