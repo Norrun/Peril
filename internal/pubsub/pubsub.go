@@ -11,6 +11,26 @@ import (
 
 const ConnectStr string = "amqp://guest:guest@localhost:5672/"
 
+type AckType int
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
+)
+
+func (receiver AckType) String() string {
+	switch receiver {
+	case Ack:
+		return "Ack"
+	case NackRequeue:
+		return "NackRequeue"
+	case NackDiscard:
+		return "NackDiscard"
+	}
+	return "Invalid AckType"
+}
+
 func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	bod, err := json.Marshal(val)
 	if err != nil {
@@ -26,7 +46,7 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -44,8 +64,16 @@ func SubscribeJSON[T any](
 				log.Println(err)
 				continue
 			}
-			handler(arg)
-			err = delivory.Ack(false)
+			react := handler(arg)
+			switch react {
+			case Ack:
+				err = delivory.Ack(false)
+			case NackRequeue:
+				err = delivory.Nack(false, true)
+			case NackDiscard:
+				err = delivory.Nack(false, false)
+			}
+			fmt.Printf("handler did %v", react)
 			if err != nil {
 				log.Println(err)
 			}
