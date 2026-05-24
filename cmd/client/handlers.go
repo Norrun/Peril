@@ -29,8 +29,11 @@ func newMoveHandler(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.Ar
 				Attacker: am.Player,
 				Defender: gs.GetPlayerSnap(),
 			}
-			pubsub.PublishJSON(ch, routing.ExchangePerilTopic, fmt.Sprint(routing.WarRecognitionsPrefix, ".", gs.GetUsername()), msg)
-			return pubsub.NackRequeue
+			err := pubsub.PublishJSON(ch, routing.ExchangePerilTopic, fmt.Sprint(routing.WarRecognitionsPrefix, ".", gs.GetUsername()), msg)
+			if err != nil {
+				return pubsub.NackRequeue
+			}
+			return pubsub.Ack
 		default:
 			return pubsub.NackDiscard
 		}
