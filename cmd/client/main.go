@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	//defer todo.CleanupOnPanic()
+
 	fmt.Println("Starting Peril client...")
 	con, err := amqp.Dial(pubsub.ConnectStr)
 	if err != nil {
@@ -67,7 +67,7 @@ func gameLoop(state *gamelogic.GameState, ch *amqp.Channel, name string) {
 				am,
 			)
 			if err != nil {
-				fmt.Println(err.Error())
+				//fmt.Println(err.Error())
 				continue
 			}
 			fmt.Println("move succesfull")
