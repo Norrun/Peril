@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/todo"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -31,7 +32,12 @@ func (receiver AckType) String() string {
 	return "Invalid AckType"
 }
 
-func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
+func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) (err error) {
+	defer func() {
+		if err != nil {
+			err = todo.MustHandle(err)
+		}
+	}()
 	bod, err := json.Marshal(val)
 	if err != nil {
 		return err
@@ -48,11 +54,11 @@ func SubscribeJSON[T any](
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
 	handler func(T) AckType,
 ) (err error) {
-	/*defer func() {
+	defer func() {
 		if err != nil {
 			err = todo.MustHandle(err)
 		}
-	}()*/
+	}()
 
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
