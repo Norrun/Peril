@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+	//defer todo.CleanupOnPanic()
 	fmt.Println("Starting Peril client...")
 	con, err := amqp.Dial(pubsub.ConnectStr)
 	if err != nil {
@@ -23,24 +24,25 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	//_, _, err = pubsub.DeclareAndBind(con, routing.ExchangePerilDirect, , routing.PauseKey, pubsub.Transient)
-	state := gamelogic.NewGameState(name)
-	err = pubsub.SubscribeJSON(con,
-		routing.ExchangePerilDirect,
-		fmt.Sprint(routing.PauseKey, ".", name),
-		routing.PauseKey, pubsub.Transient,
-		newPauseHandler(state))
+
+	ch, err := con.Channel()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	err = pubsub.SubscribeJSON(con,
-		routing.ExchangePerilTopic,
-		fmt.Sprint(routing.ArmyMovesPrefix, ".", name),
-		fmt.Sprint(routing.ArmyMovesPrefix, ".", "*"),
-		pubsub.Transient, newMoveHandler(state),
-	)
-	ch, err := con.Channel()
+	//_, _, err = pubsub.DeclareAndBind(con, routing.ExchangePerilDirect, , routing.PauseKey, pubsub.Transient)
+	state := gamelogic.NewGameState(name)
 
+	err = Subscriptions(name, con, ch, state)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	gameLoop(state, ch, name)
+
+	fmt.Println("Quitting the game")
+}
+
+func gameLoop(state *gamelogic.GameState, ch *amqp.Channel, name string) {
 	for {
 		input := gamelogic.GetInput()
 		if len(input) == 0 {
@@ -86,9 +88,35 @@ func main() {
 		}
 
 	}
-	//defer nhelps.RunLogErr(ch.Close,"error closing channel")
-	/*sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
-	<-sigChan*/
-	fmt.Println("Quitting the game")
+}
+
+func Subscriptions(name string, con *amqp.Connection, ch *amqp.Channel, state *gamelogic.GameState) error {
+
+	err := pubsub.SubscribeJSON(con,
+		routing.ExchangePerilDirect,
+		fmt.Sprint(routing.PauseKey, ".", name),
+		routing.PauseKey, pubsub.Transient,
+		newPauseHandler(state))
+	if err != nil {
+		return err
+	}
+
+	err = pubsub.SubscribeJSON(con,
+		routing.ExchangePerilTopic,
+		fmt.Sprint(routing.ArmyMovesPrefix, ".", name),
+		fmt.Sprint(routing.ArmyMovesPrefix, ".", "*"),
+		pubsub.Transient, newMoveHandler(state, ch),
+	)
+	if err != nil {
+		return err
+	}
+
+	err = pubsub.SubscribeJSON(con,
+		routing.ExchangePerilTopic, "war",
+		fmt.Sprint(routing.WarRecognitionsPrefix, ".", "*"),
+		pubsub.Durable, newWarHandler(state))
+	if err != nil {
+		return err
+	}
+	return nil
 }

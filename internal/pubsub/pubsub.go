@@ -47,11 +47,18 @@ func SubscribeJSON[T any](
 	key string,
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
 	handler func(T) AckType,
-) error {
+) (err error) {
+	/*defer func() {
+		if err != nil {
+			err = todo.MustHandle(err)
+		}
+	}()*/
+
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
 		return err
 	}
+
 	delivoryCh, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return err
