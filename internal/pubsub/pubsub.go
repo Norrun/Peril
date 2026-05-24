@@ -73,7 +73,7 @@ func SubscribeJSON[T any](
 			case NackDiscard:
 				err = delivory.Nack(false, false)
 			}
-			fmt.Printf("handler did %v", react)
+			//fmt.Printf("handler did %v", react)
 			if err != nil {
 				log.Println(err)
 			}
@@ -102,7 +102,7 @@ func DeclareAndBind(
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("failed to Create Channel: %v", err)
 	}
-	queue, err := ch.QueueDeclare(queueName, queueType == Durable, queueType == Transient, queueType == Transient, false, nil)
+	queue, err := ch.QueueDeclare(queueName, queueType == Durable, queueType == Transient, queueType == Transient, false, amqp.Table{"x-dead-letter-exchange": "peril_dlx"})
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("failed to Declear Queue: %v", err)
 	}
