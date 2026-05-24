@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -31,6 +32,7 @@ func newMoveHandler(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.Ar
 			}
 			err := pubsub.PublishJSON(ch, routing.ExchangePerilTopic, fmt.Sprint(routing.WarRecognitionsPrefix, ".", gs.GetUsername()), msg)
 			if err != nil {
+				log.Println(err)
 				return pubsub.NackRequeue
 			}
 			return pubsub.Ack

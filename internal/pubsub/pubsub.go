@@ -42,7 +42,10 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) (err erro
 	if err != nil {
 		return err
 	}
-	ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{ContentType: "application/json", Body: bod})
+	err = ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{ContentType: "application/json", Body: bod})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -70,3 +70,10 @@ func (mhe *mustHandleError) ignored() {
 
 	log.Printf("ERROR IGNORED: %s\n", mhe.Error())
 }
+func Handle(err error) bool {
+	if mhe, ok := err.(MustHandleError); ok {
+		mhe.Handle()
+		return true
+	}
+	return false
+}
