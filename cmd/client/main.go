@@ -117,7 +117,7 @@ func Subscriptions(name string, con *amqp.Connection, ch *amqp.Channel, state *g
 	err = pubsub.SubscribeJSON(con,
 		routing.ExchangePerilTopic, "war",
 		fmt.Sprint(routing.WarRecognitionsPrefix, ".", "*"),
-		pubsub.Durable, newWarHandler(state))
+		pubsub.Durable, newWarHandler(state, ch))
 	if err != nil {
 		return err
 	}
