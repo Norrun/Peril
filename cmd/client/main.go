@@ -8,11 +8,14 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/nhelps"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/todo"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
+	defer todo.LogIgnoredErrorsOnPanic()
+	onfatal := todo.GetResidualErrorsError
 
 	fmt.Println("Starting Peril client...")
 	con, err := amqp.Dial(pubsub.ConnectStr)
@@ -22,19 +25,19 @@ func main() {
 	defer nhelps.RunLogErr(con.Close, "error closing connection to amqp server")
 	name, err := gamelogic.ClientWelcome()
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln(err, onfatal())
 	}
 
 	ch, err := con.Channel()
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln(err, onfatal())
 	}
 	//_, _, err = pubsub.DeclareAndBind(con, routing.ExchangePerilDirect, , routing.PauseKey, pubsub.Transient)
 	state := gamelogic.NewGameState(name)
 
 	err = Subscriptions(name, con, ch, state)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln(err, onfatal())
 	}
 
 	gameLoop(state, ch, name)

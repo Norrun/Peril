@@ -1,27 +1,63 @@
 package todo
 
 import (
+	"errors"
+	"fmt"
 	"log"
+	"weak"
+
 	"runtime"
 	"sync"
 )
 
 var unhandled sync.Map
 
-func CleanupOnPanic() {
+func LogIgnoredErrorsOnPanic() {
 	r := recover()
 	if r == nil {
 		return
 	}
+	log.Println(ReadResidualErrorsString())
+	panic(r)
+}
+
+func ReadResidualErrorsString() string {
+	result := ""
+
 	unhandled.Range(func(key, value any) bool {
-		if f, ok := value.(func()); ok {
-			f()
+		if s, ok := value.(string); ok {
+			result += s
+		}
+		if wp, ok := key.(weak.Pointer[mustHandleError]); ok && wp.Value() != nil {
+			wp.Value().Handle()
 		}
 
 		return true
 	})
-	panic(r)
+	return result
+}
 
+func GetResidualErrors() []error {
+	errs := make([]error, 0)
+	unhandled.Range(func(key, value any) bool {
+
+		if wp, ok := key.(weak.Pointer[mustHandleError]); ok && wp.Value() != nil {
+			errs = append(errs, wp.Value())
+		}
+
+		return true
+	})
+	return errs
+}
+
+func GetResidualErrorsError() error {
+
+	errs := GetResidualErrors()
+	if len(errs) == 0 {
+		return nil
+	}
+	err := errors.Join(errs...)
+	return err
 }
 
 type MustHandleError interface {
@@ -36,17 +72,21 @@ type mustHandleError struct {
 }
 
 func MustHandle(err error) MustHandleError {
+	if err != nil {
+		return nil
+	}
 
-	if mhe, ok := err.(*mustHandleError); ok {
+	if mhe, ok := errors.AsType[*mustHandleError](err); ok {
 		mhe.Handle()
 	}
 
 	result := &mustHandleError{inner: err}
 	runtime.SetFinalizer(result, func(mhe *mustHandleError) {
-		mhe.ignored()
-		unhandled.Delete(mhe)
+		log.Println(mhe.ignored())
+		mhe.Handle()
+
 	})
-	unhandled.Store(result, result.ignored)
+	unhandled.Store(result.toKey(), result.ignored())
 	return result
 }
 
@@ -57,18 +97,20 @@ func (receiver *mustHandleError) Error() string {
 
 func (receiver *mustHandleError) Handle() {
 	receiver.handled = true
+	unhandled.Delete(receiver.toKey())
 }
 func (receiver *mustHandleError) Unwrap() error {
 	receiver.Handle()
 	return receiver.inner
 }
 
-func (mhe *mustHandleError) ignored() {
-	if mhe.handled {
-		return
-	}
+func (mhe *mustHandleError) ignored() string {
 
-	log.Printf("ERROR IGNORED: %s\n", mhe.Error())
+	return fmt.Sprintf("ERROR IGNORED: %s\n", mhe.inner.Error())
+}
+
+func (receiver *mustHandleError) toKey() weak.Pointer[mustHandleError] {
+	return weak.Make(receiver)
 }
 func Handle(err error) bool {
 	if mhe, ok := err.(MustHandleError); ok {
