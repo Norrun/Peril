@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"fmt"
+	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -56,4 +57,50 @@ func DeclareAndBind(
 		return nil, amqp.Queue{}, fmt.Errorf("failed to Bind Queue: %v", err)
 	}
 	return ch, queue, nil
+}
+
+func subscribe[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	simpleQueueType SimpleQueueType,
+	handler func(T) AckType,
+	unmarshaller func([]byte) (T, error),
+) error {
+	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
+	if err != nil {
+		return err
+	}
+
+	delivoryCh, err := ch.Consume(queueName, "", false, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for delivory := range delivoryCh {
+
+			arg, err := unmarshaller(delivory.Body)
+
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			react := handler(arg)
+			switch react {
+			case Ack:
+				err = delivory.Ack(false)
+			case NackRequeue:
+				err = delivory.Nack(false, true)
+			case NackDiscard:
+				err = delivory.Nack(false, false)
+			}
+			//fmt.Printf("handler did %v", react)
+			if err != nil {
+				log.Println(err)
+			}
+
+		}
+	}()
+	return nil
 }

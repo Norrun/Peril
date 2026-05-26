@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"runtime/debug"
+	"time"
 	"weak"
 
 	"runtime"
@@ -17,16 +19,56 @@ func LogIgnoredErrorsOnPanic() {
 	if r == nil {
 		return
 	}
-	log.Println(ReadResidualErrorsString())
+	log.Println("Panicing")
+
+	unhandled.Range(func(key, value any) bool {
+		if s, ok := value.(unhandledEntry); ok {
+
+			log.Println(s.msg)
+		}
+		return true
+	})
+
+	//log.Println(ReadResidualErrorsString())
+
+	debug.PrintStack()
+
 	panic(r)
+}
+
+func StartPeriodicDump(interval, maxAge time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			//fmt.Println("scanning")
+			fresh := true
+			unhandled.Range(func(key, value any) bool {
+				remove := false
+				if s, ok := value.(unhandledEntry); ok && time.Since(s.creation) > maxAge {
+					if fresh {
+						log.Println("Periodic scan")
+						fresh = false
+					}
+					remove = true
+					log.Println(s.msg)
+				}
+				if errp, ok := key.(weak.Pointer[mustHandleError]); ok && errp.Value() != nil && remove {
+					errp.Value().Handle()
+
+				}
+				return true
+			})
+		}
+	}()
 }
 
 func ReadResidualErrorsString() string {
 	result := ""
 
 	unhandled.Range(func(key, value any) bool {
-		if s, ok := value.(string); ok {
-			result += s
+		if s, ok := value.(unhandledEntry); ok {
+			result += s.msg
 		}
 		if wp, ok := key.(weak.Pointer[mustHandleError]); ok && wp.Value() != nil {
 			wp.Value().Handle()
@@ -71,8 +113,13 @@ type mustHandleError struct {
 	handled bool
 }
 
+type unhandledEntry struct {
+	msg      string
+	creation time.Time
+}
+
 func MustHandle(err error) MustHandleError {
-	if err != nil {
+	if err == nil {
 		return nil
 	}
 
@@ -86,7 +133,7 @@ func MustHandle(err error) MustHandleError {
 		mhe.Handle()
 
 	})
-	unhandled.Store(result.toKey(), result.ignored())
+	unhandled.Store(result.toKey(), unhandledEntry{msg: result.ignored(), creation: time.Now()})
 	return result
 }
 
@@ -105,7 +152,6 @@ func (receiver *mustHandleError) Unwrap() error {
 }
 
 func (mhe *mustHandleError) ignored() string {
-
 	return fmt.Sprintf("ERROR IGNORED: %s\n", mhe.inner.Error())
 }
 

@@ -8,12 +8,15 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/nhelps"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/todo"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
 	log.Println("Starting Peril server...")
 	gamelogic.PrintServerHelp()
+	defer log.Println(todo.GetResidualErrorsError())
+	defer todo.LogIgnoredErrorsOnPanic()
 
 	con, err := amqp.Dial(pubsub.ConnectStr)
 	if err != nil {
@@ -22,8 +25,20 @@ func main() {
 	defer nhelps.RunLogErr(con.Close, "error closing connection to amqp server")
 
 	log.Println("Connection to broker succesfull")
-	_, _, err = pubsub.DeclareAndBind(con,
-		routing.ExchangePerilTopic, routing.GameLogSlug, fmt.Sprint(routing.GameLogSlug, ".", "*"), pubsub.Durable)
+
+	err = pubsub.SubscribeGob(con,
+		routing.ExchangePerilTopic, routing.GameLogSlug, fmt.Sprint(routing.GameLogSlug, ".", "*"), pubsub.Durable, func(entry routing.GameLog) pubsub.AckType {
+			defer fmt.Print("> ")
+			err := gamelogic.WriteLog(entry)
+			if err != nil {
+				log.Println("error on logging ", err)
+				return pubsub.NackDiscard
+			}
+			return pubsub.Ack
+		})
+	if err != nil {
+		log.Fatalln(err)
+	}
 	qChan, err := con.Channel()
 	if err != nil {
 		log.Fatalln(err)

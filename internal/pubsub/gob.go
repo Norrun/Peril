@@ -29,3 +29,26 @@ func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) (err error
 	}
 	return nil
 }
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T) AckType,
+) (err error) {
+	defer func() {
+		if err != nil {
+			err = todo.MustHandle(err)
+		}
+	}()
+
+	err = subscribe(conn, exchange, queueName, key, queueType, handler, func(b []byte) (T, error) {
+		var res T
+		decoder := gob.NewDecoder(bytes.NewBuffer(b))
+		return res, decoder.Decode(&res)
+	})
+
+	return err
+}

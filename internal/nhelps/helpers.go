@@ -19,3 +19,15 @@ func RunLogErrArg[T any](operation func(T) error, arg T, fmsg string, v ...any) 
 		log.Printf("%s:%v:%v", msg, arg, err)
 	}
 }
+
+func AsDecorator[T, I, O any](returning *T, mod func(I) O) {
+	if returning == nil {
+		return
+	}
+	if i, ok := any(*returning).(I); ok {
+		if o, ok := any(mod(i)).(T); ok {
+			*returning = o
+		}
+	}
+
+}
